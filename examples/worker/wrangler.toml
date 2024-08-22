@@ -1,0 +1,11 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "checkr"
+main = "src/index.ts"
+compatibility_date = "2024-08-15"
+compatibility_flags = ["nodejs_compat"]
+
+# Bind another Worker service. Use this binding to call another Worker without network overhead.
+# Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
+[[services]]
+binding = "CHECKD"
+service = "checkd"

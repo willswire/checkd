@@ -15,8 +15,7 @@ interface DeviceClaim extends jose.JWTPayload {
 export default class extends WorkerEntrypoint<Env> {
 	// Fetch method to check if the worker is running
 	async fetch(): Promise<Response> {
-		console.log('Fetch method called');
-		return new Response('Checkd is running');
+		return new Response('Checkd is running!');
 	}
 
 	/**
@@ -33,12 +32,8 @@ export default class extends WorkerEntrypoint<Env> {
 			// Create the claim object for the JWT
 			const claim: DeviceClaim = this.createClaim(deviceToken);
 
-			// Log the claim for debugging purposes
-			console.log('Claim:', claim);
-
 			// Generate the JWT using the claim
 			const jwt: string = await this.generateJWT(claim);
-			console.log('Upstream Request Token:', jwt);
 
 			// Get the upstream endpoint based on the environment type
 			const upstreamEndpoint: string = this.getUpstreamEndpoint(isDevelopment);
@@ -49,9 +44,6 @@ export default class extends WorkerEntrypoint<Env> {
 			// Handle the upstream response and return the result
 			return this.handleUpstreamResponse(upstreamResponse);
 		} catch (error) {
-			// Log the error for debugging purposes
-			console.error('Error during device check:\n', error);
-
 			// Return false in the event of an exception
 			return false;
 		}
@@ -145,11 +137,8 @@ export default class extends WorkerEntrypoint<Env> {
 	 * @throws Error if the upstream response is not successful
 	 */
 	private async handleUpstreamResponse(upstreamResponse: Response): Promise<boolean> {
-		console.log('Upstream Response Status:', upstreamResponse.status);
-
 		if (upstreamResponse.status !== 200) {
 			const errorText = await upstreamResponse.text();
-			console.log('Upstream Response Text:', errorText);
 			throw new Error(`Upstream response error: ${upstreamResponse.status} - ${errorText}`);
 		}
 
