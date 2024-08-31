@@ -1,9 +1,6 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import * as jose from 'jose';
 
-// Constant for JWT algorithm
-const ALGORITHM = 'ES256';
-
 // Define the claim interface extending JWTPayload
 interface DeviceClaim extends jose.JWTPayload {
 	device_token: string;
@@ -20,43 +17,43 @@ export default class extends WorkerEntrypoint<Env> {
 
 	/**
 	 * Method to check the device token by calling the upstream Apple endpoint
-	 * @param request - The incoming request object
+	 * @param headers - The request headers object
 	 * @returns A promise that resolves to a boolean indicating the success of the check
 	 */
-	async check(request: Request): Promise<boolean> {
+	async check(headers: Headers): Promise<boolean> {
 		try {
 			// Retrieve device token and environment type from the request headers
-			const deviceToken: string = this.getDeviceToken(request);
-			const isDevelopment: boolean = this.isDevelopmentEnvironment(request);
+			const deviceToken = this.getDeviceToken(headers);
+			const isDevelopment = this.isDevelopmentEnvironment(headers);
 
 			// Create the claim object for the JWT
-			const claim: DeviceClaim = this.createClaim(deviceToken);
+			const claim = this.createClaim(deviceToken);
 
 			// Generate the JWT using the claim
-			const jwt: string = await this.generateJWT(claim);
+			const jwt = await this.generateJWT(claim);
 
 			// Get the upstream endpoint based on the environment type
-			const upstreamEndpoint: string = this.getUpstreamEndpoint(isDevelopment);
+			const upstreamEndpoint = this.getUpstreamEndpoint(isDevelopment);
 
 			// Send the claim to the upstream endpoint and retrieve the response
-			const upstreamResponse: Response = await this.sendUpstreamRequest(upstreamEndpoint, jwt, claim);
+			const upstreamResponse = await this.sendUpstreamRequest(upstreamEndpoint, jwt, claim);
 
-			// Handle the upstream response and return the result
-			return this.handleUpstreamResponse(upstreamResponse);
+			// Check if the upstream response status is 200 (OK)
+			return upstreamResponse.status === 200;
 		} catch (error) {
-			// Return false in the event of an exception
+			console.error('Error during device check:', error);
 			return false;
 		}
 	}
 
 	/**
 	 * Retrieves the device token from the request headers
-	 * @param request - The incoming request object
+	 * @param headers - The request headers object
 	 * @returns The device token as a string
 	 * @throws Error if the device token is missing
 	 */
-	private getDeviceToken(request: Request): string {
-		const deviceToken = request.headers.get('X-Apple-Device-Token');
+	private getDeviceToken(headers: Headers): string {
+		const deviceToken = headers.get('X-Apple-Device-Token');
 		if (!deviceToken) {
 			throw new Error('Device token is missing');
 		}
@@ -65,11 +62,11 @@ export default class extends WorkerEntrypoint<Env> {
 
 	/**
 	 * Determines if the environment is a development environment
-	 * @param request - The incoming request object
+	 * @param headers - The request headers object
 	 * @returns A boolean indicating if the environment is for development
 	 */
-	private isDevelopmentEnvironment(request: Request): boolean {
-		return request.headers.get('X-Apple-Device-Development') === 'true';
+	private isDevelopmentEnvironment(headers: Headers): boolean {
+		return headers.get('X-Apple-Device-Development') === 'true';
 	}
 
 	/**
@@ -78,10 +75,11 @@ export default class extends WorkerEntrypoint<Env> {
 	 * @returns The claim object containing device_token, transaction_id, and timestamp
 	 */
 	private createClaim(deviceToken: string): DeviceClaim {
+		const currentTimestamp = Date.now();
 		return {
 			device_token: deviceToken,
-			transaction_id: `trns-${Date.now()}`,
-			timestamp: Date.now(),
+			transaction_id: `trns-${currentTimestamp}`,
+			timestamp: currentTimestamp,
 		};
 	}
 
@@ -91,11 +89,11 @@ export default class extends WorkerEntrypoint<Env> {
 	 * @returns A promise that resolves to the generated JWT string
 	 */
 	private async generateJWT(claim: DeviceClaim): Promise<string> {
-		const kid: string = this.env.APPLE_KEY_ID;
-		const privateKey = await jose.importPKCS8(this.env.APPLE_PRIVATE_KEY, ALGORITHM);
+		const kid = this.env.APPLE_KEY_ID;
+		const privateKey = await jose.importPKCS8(this.env.APPLE_PRIVATE_KEY, 'ES256');
 
 		return new jose.SignJWT(claim)
-			.setProtectedHeader({ alg: ALGORITHM, kid })
+			.setProtectedHeader({ alg: 'ES256', kid })
 			.setIssuedAt()
 			.setIssuer(this.env.APPLE_DEVELOPER_ID)
 			.setExpirationTime('1h')
@@ -120,28 +118,20 @@ export default class extends WorkerEntrypoint<Env> {
 	 * @returns A promise that resolves to the upstream response object
 	 */
 	private async sendUpstreamRequest(upstreamEndpoint: string, jwt: string, claim: DeviceClaim): Promise<Response> {
-		return fetch(upstreamEndpoint, {
+		const requestInit: RequestInit = {
 			method: 'POST',
 			body: JSON.stringify(claim),
 			headers: {
 				Authorization: `Bearer ${jwt}`,
 				'Content-Type': 'application/json',
 			},
-		});
-	}
+		};
 
-	/**
-	 * Handles the upstream response
-	 * @param upstreamResponse - The upstream response object
-	 * @returns A promise that resolves to a boolean indicating the success of the operation
-	 * @throws Error if the upstream response is not successful
-	 */
-	private async handleUpstreamResponse(upstreamResponse: Response): Promise<boolean> {
-		if (upstreamResponse.status !== 200) {
-			const errorText = await upstreamResponse.text();
-			throw new Error(`Upstream response error: ${upstreamResponse.status} - ${errorText}`);
+		try {
+			return await fetch(upstreamEndpoint, requestInit);
+		} catch (error) {
+			console.error('Failed to send request to upstream endpoint:', error);
+			throw new Error('Failed to send request to upstream');
 		}
-
-		return true;
 	}
 }
