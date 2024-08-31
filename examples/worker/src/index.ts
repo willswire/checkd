@@ -1,6 +1,6 @@
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
-		const isValid = await env.CHECKD.check(request);
+		const isValid = await env.CHECKD.check(request.headers);
 		if (isValid) {
 			return new Response('Device Check Succeeded!');
 		} else {
