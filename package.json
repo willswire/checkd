@@ -1,6 +1,6 @@
 {
 	"name": "checkd",
-	"version": "1.0.1",
+	"version": "2.0.0",
 	"private": true,
 	"scripts": {
 		"deploy": "wrangler deploy",
@@ -9,11 +9,11 @@
 		"cf-typegen": "wrangler types"
 	},
 	"devDependencies": {
-		"@cloudflare/workers-types": "^4.20240815.0",
-		"typescript": "^5.5.2",
-		"wrangler": "^3.60.3"
+		"@cloudflare/workers-types": "^4.20240821.1",
+		"typescript": "^5.5.4",
+		"wrangler": "^3.73.0"
 	},
 	"dependencies": {
-		"jose": "^5.7.0"
+		"jose": "^5.8.0"
 	}
 }
