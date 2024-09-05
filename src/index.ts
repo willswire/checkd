@@ -10,85 +10,119 @@ interface DeviceClaim extends jose.JWTPayload {
 
 // Main class extending WorkerEntrypoint with the environment type
 export default class extends WorkerEntrypoint<Env> {
-	// Fetch method to check if the worker is running
 	async fetch(): Promise<Response> {
 		return new Response('Checkd is running!');
 	}
 
-	/**
-	 * Method to check the device token by calling the upstream Apple endpoint
-	 * @param headers - The request headers object
-	 * @returns A promise that resolves to a boolean indicating the success of the check
-	 */
 	async check(headers: Headers): Promise<boolean> {
 		try {
-			// Retrieve device token and environment type from the request headers
-			const deviceToken = this.getDeviceToken(headers);
-			const isDevelopment = this.isDevelopmentEnvironment(headers);
+			// Log all headers
+			headers.forEach((value, key) => {
+				console.log(`${key}: ${value}`);
+			});
 
-			// Create the claim object for the JWT
-			const claim = this.createClaim(deviceToken);
-
-			// Generate the JWT using the claim
-			const jwt = await this.generateJWT(claim);
-
-			// Get the upstream endpoint based on the environment type
-			const upstreamEndpoint = this.getUpstreamEndpoint(isDevelopment);
-
-			// Send the claim to the upstream endpoint and retrieve the response
-			const upstreamResponse = await this.sendUpstreamRequest(upstreamEndpoint, jwt, claim);
-
-			// Check if the upstream response status is 200 (OK)
-			return upstreamResponse.status === 200;
+			// Validate Cloudflare Access token or Apple Device token
+			if (headers.has('Cf-Access-Jwt-Assertion')) {
+				console.log('validating Cloudflare Access Token');
+				return await this.validateCloudflareAccessToken(headers);
+			} else if (headers.has('X-Apple-Device-Token')) {
+				console.log('validating Apple Device Token');
+				return await this.validateAppleDeviceToken(headers);
+			} else {
+				console.log('no valid tokens present');
+				return false;
+			}
 		} catch (error) {
-			console.error('Error during device check:', error);
+			console.error('Error during check operation:', error);
 			return false;
 		}
 	}
 
 	/**
-	 * Retrieves the device token from the request headers
-	 * @param headers - The request headers object
-	 * @returns The device token as a string
-	 * @throws Error if the device token is missing
+	 * Validates the Cloudflare Access token
+	 * @param headers - The request headers
+	 * @returns A promise that resolves to a boolean indicating whether the token is valid
 	 */
-	private getDeviceToken(headers: Headers): string {
-		const deviceToken = headers.get('X-Apple-Device-Token');
-		if (!deviceToken) {
-			throw new Error('Device token is missing');
+	private async validateCloudflareAccessToken(headers: Headers): Promise<boolean> {
+		const token = headers.get('Cf-Access-Jwt-Assertion');
+		if (!token) return false;
+
+		const teamName = this.env.CF_TEAM_NAME;
+		const audTag = this.env.CF_AUD_TAG;
+		const certsUrl = `https://${teamName}.cloudflareaccess.com/cdn-cgi/access/certs`;
+
+		try {
+			const JWKS = jose.createRemoteJWKSet(new URL(certsUrl));
+
+			const { payload, protectedHeader } = await jose.jwtVerify(token, JWKS, {
+				audience: audTag,
+				issuer: `https://${teamName}.cloudflareaccess.com`,
+			});
+
+			console.log('Token payload:', payload);
+			console.log('Protected header:', protectedHeader);
+
+			return true;
+		} catch (error) {
+			console.error('Error verifying Cloudflare Access token:', error);
+			return false;
 		}
-		return deviceToken;
 	}
 
 	/**
-	 * Determines if the environment is a development environment
+	 * Validates the Apple Device token by calling the upstream Apple endpoint
+	 * @param headers - The request headers
+	 * @returns A promise that resolves to a boolean indicating the success of the validation
+	 */
+	private async validateAppleDeviceToken(headers: Headers): Promise<boolean> {
+		try {
+			const deviceToken = this.getRequiredHeader(headers, 'X-Apple-Device-Token');
+			const isDevelopment = headers.get('X-Apple-Device-Development') === 'true';
+			const claim = this.createDeviceClaim(deviceToken);
+			const jwt = await this.generateAppleJWT(claim);
+			const upstreamUrl = this.getAppleEndpoint(isDevelopment);
+			const response = await this.sendToApple(upstreamUrl, jwt, claim);
+
+			return response.status === 200;
+		} catch (error) {
+			console.error('Error during device token validation:', error);
+			return false;
+		}
+	}
+
+	/**
+	 * Retrieves the required header value
 	 * @param headers - The request headers object
-	 * @returns A boolean indicating if the environment is for development
+	 * @param headerName - The name of the header to retrieve
+	 * @returns The header value as a string
+	 * @throws Error if the header is missing
 	 */
-	private isDevelopmentEnvironment(headers: Headers): boolean {
-		return headers.get('X-Apple-Device-Development') === 'true';
+	private getRequiredHeader(headers: Headers, headerName: string): string {
+		const value = headers.get(headerName);
+		if (!value) throw new Error(`${headerName} is missing`);
+		return value;
 	}
 
 	/**
-	 * Creates the claim object for the JWT
+	 * Creates the claim object for the Apple JWT
 	 * @param deviceToken - The device token string
-	 * @returns The claim object containing device_token, transaction_id, and timestamp
+	 * @returns The claim object containing deviceToken, transactionId, and timestamp
 	 */
-	private createClaim(deviceToken: string): DeviceClaim {
-		const currentTimestamp = Date.now();
+	private createDeviceClaim(deviceToken: string): DeviceClaim {
+		const timestamp = Date.now();
 		return {
 			device_token: deviceToken,
-			transaction_id: `trns-${currentTimestamp}`,
-			timestamp: currentTimestamp,
+			transaction_id: `trns-${timestamp}`,
+			timestamp: timestamp,
 		};
 	}
 
 	/**
-	 * Generates a JWT using the claim object
+	 * Generates a JWT for Apple validation
 	 * @param claim - The claim object to be signed
 	 * @returns A promise that resolves to the generated JWT string
 	 */
-	private async generateJWT(claim: DeviceClaim): Promise<string> {
+	private async generateAppleJWT(claim: DeviceClaim): Promise<string> {
 		const kid = this.env.APPLE_KEY_ID;
 		const privateKey = await jose.importPKCS8(this.env.APPLE_PRIVATE_KEY, 'ES256');
 
@@ -101,23 +135,23 @@ export default class extends WorkerEntrypoint<Env> {
 	}
 
 	/**
-	 * Retrieves the upstream endpoint URL based on the environment type
+	 * Retrieves the Apple endpoint URL based on the environment type
 	 * @param isDevelopment - Boolean indicating if the environment is for development
-	 * @returns The upstream endpoint URL as a string
+	 * @returns The Apple endpoint URL as a string
 	 */
-	private getUpstreamEndpoint(isDevelopment: boolean): string {
+	private getAppleEndpoint(isDevelopment: boolean): string {
 		const environment = isDevelopment ? 'api.development' : 'api';
 		return `https://${environment}.devicecheck.apple.com/v1/validate_device_token`;
 	}
 
 	/**
-	 * Sends the claim to the upstream endpoint and retrieves the response
-	 * @param upstreamEndpoint - The upstream endpoint URL
+	 * Sends the claim to the Apple endpoint and retrieves the response
+	 * @param url - The Apple endpoint URL
 	 * @param jwt - The generated JWT string
 	 * @param claim - The claim object to be sent
 	 * @returns A promise that resolves to the upstream response object
 	 */
-	private async sendUpstreamRequest(upstreamEndpoint: string, jwt: string, claim: DeviceClaim): Promise<Response> {
+	private async sendToApple(url: string, jwt: string, claim: DeviceClaim): Promise<Response> {
 		const requestInit: RequestInit = {
 			method: 'POST',
 			body: JSON.stringify(claim),
@@ -128,10 +162,10 @@ export default class extends WorkerEntrypoint<Env> {
 		};
 
 		try {
-			return await fetch(upstreamEndpoint, requestInit);
+			return await fetch(url, requestInit);
 		} catch (error) {
-			console.error('Failed to send request to upstream endpoint:', error);
-			throw new Error('Failed to send request to upstream');
+			console.error('Failed to send request to Apple endpoint:', error);
+			throw new Error('Failed to send request to Apple');
 		}
 	}
 }

@@ -13,10 +13,13 @@ class SessionHandler {
 			if let data = try? await device.generateToken() {
 				print("Device token: \(data.base64EncodedString())")
 				let tokenString = data.base64EncodedString()
-				sessionConfiguration.httpAdditionalHeaders = [
-					"X-Apple-Device-Token": tokenString,
-					"X-Apple-Device-Development": "true"
-				]
+#if DEBUG
+				sessionConfiguration.httpAdditionalHeaders = ["X-Apple-Device-Development": "true"]
+#else
+				sessionConfiguration.httpAdditionalHeaders = ["X-Apple-Device-Development": "false"]
+#endif
+				sessionConfiguration.httpAdditionalHeaders = ["X-Apple-Device-Token": tokenString]
+
 			}
 		} else {
 			print("Device does not support DeviceCheck")
