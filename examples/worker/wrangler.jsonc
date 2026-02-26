@@ -1,0 +1,16 @@
+{
+	"name": "checkr",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-02-25",
+	"observability": {
+		"enabled": true,
+	},
+	// Bind another Worker service. Use this binding to call another Worker without network overhead.
+	// Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
+	"services": [
+		{
+			"binding": "CHECKD",
+			"service": "checkd",
+		},
+	],
+}
