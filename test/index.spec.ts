@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { generateKeyPair, exportPKCS8 } from 'jose';
 import worker from '../src/index';
 
 // Shim WorkerEntrypoint so the class can be instantiated in Node
@@ -28,6 +29,12 @@ function makeEnv(overrides: Partial<Env> = {}): Env {
 
 function makeCtx(): ExecutionContext {
 	return { waitUntil: vi.fn(), passThroughOnException: vi.fn() } as unknown as ExecutionContext;
+}
+
+async function makeValidEnv(): Promise<Env> {
+	const { privateKey } = await generateKeyPair('ES256');
+	const pem = await exportPKCS8(privateKey);
+	return makeEnv({ APPLE_PRIVATE_KEY: pem });
 }
 
 // ---------------------------------------------------------------------------
@@ -75,61 +82,91 @@ describe('check handler', () => {
 
 	it('treats missing X-Apple-Device-Development header as production', async () => {
 		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(null, { status: 200 }));
-		const { generateKeyPair, exportPKCS8 } = await import('jose');
-		const { privateKey } = await generateKeyPair('ES256');
-		const pem = await exportPKCS8(privateKey);
-		const instance = new worker(makeCtx(), makeEnv({ APPLE_PRIVATE_KEY: pem }));
-		const headers = new Headers({ 'X-Apple-Device-Token': 'test-token' });
-		await instance.check(headers);
-		const calledUrl = (fetchSpy.mock.calls[0][0] as string);
+		const instance = new worker(makeCtx(), await makeValidEnv());
+		await instance.check(new Headers({ 'X-Apple-Device-Token': 'test-token' }));
+		const calledUrl = fetchSpy.mock.calls[0][0] as string;
 		expect(calledUrl).toContain('api.devicecheck.apple.com');
 		expect(calledUrl).not.toContain('api.development');
-		fetchSpy.mockRestore();
 	});
 
 	it('uses development endpoint when X-Apple-Device-Development is true', async () => {
 		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(null, { status: 200 }));
-		const { generateKeyPair, exportPKCS8 } = await import('jose');
-		const { privateKey } = await generateKeyPair('ES256');
-		const pem = await exportPKCS8(privateKey);
-		const instance = new worker(makeCtx(), makeEnv({ APPLE_PRIVATE_KEY: pem }));
-		const headers = new Headers({ 'X-Apple-Device-Token': 'test-token', 'X-Apple-Device-Development': 'true' });
-		await instance.check(headers);
-		const calledUrl = (fetchSpy.mock.calls[0][0] as string);
+		const instance = new worker(makeCtx(), await makeValidEnv());
+		await instance.check(new Headers({ 'X-Apple-Device-Token': 'test-token', 'X-Apple-Device-Development': 'true' }));
+		const calledUrl = fetchSpy.mock.calls[0][0] as string;
 		expect(calledUrl).toContain('api.development.devicecheck.apple.com');
-		fetchSpy.mockRestore();
+	});
+
+	it('calls the validate_device_token endpoint', async () => {
+		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(null, { status: 200 }));
+		const instance = new worker(makeCtx(), await makeValidEnv());
+		await instance.check(new Headers({ 'X-Apple-Device-Token': 'test-token' }));
+		const calledUrl = fetchSpy.mock.calls[0][0] as string;
+		expect(calledUrl).toContain('/v1/validate_device_token');
+	});
+
+	it('sends a POST request upstream', async () => {
+		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(null, { status: 200 }));
+		const instance = new worker(makeCtx(), await makeValidEnv());
+		await instance.check(new Headers({ 'X-Apple-Device-Token': 'test-token' }));
+		const calledInit = fetchSpy.mock.calls[0][1] as RequestInit;
+		expect(calledInit.method).toBe('POST');
+	});
+
+	it('sends device_token, transaction_id, and timestamp in the request body', async () => {
+		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(null, { status: 200 }));
+		const instance = new worker(makeCtx(), await makeValidEnv());
+		await instance.check(new Headers({ 'X-Apple-Device-Token': 'my-device-token' }));
+		const calledInit = fetchSpy.mock.calls[0][1] as RequestInit;
+		const body = JSON.parse(calledInit.body as string);
+		expect(body.device_token).toBe('my-device-token');
+		expect(typeof body.transaction_id).toBe('string');
+		expect(body.transaction_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+		expect(typeof body.timestamp).toBe('number');
+		expect(body.timestamp).toBeGreaterThan(0);
+	});
+
+	it('sends Authorization: Bearer <JWT> header upstream', async () => {
+		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(null, { status: 200 }));
+		const instance = new worker(makeCtx(), await makeValidEnv());
+		await instance.check(new Headers({ 'X-Apple-Device-Token': 'test-token' }));
+		const calledInit = fetchSpy.mock.calls[0][1] as RequestInit;
+		const authHeader = (calledInit.headers as Record<string, string>)['Authorization'];
+		expect(authHeader).toMatch(/^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
 	});
 
 	it('returns true when upstream responds with 200', async () => {
 		vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(null, { status: 200 }));
-		const { generateKeyPair, exportPKCS8 } = await import('jose');
-		const { privateKey } = await generateKeyPair('ES256');
-		const pem = await exportPKCS8(privateKey);
-		const instance = new worker(makeCtx(), makeEnv({ APPLE_PRIVATE_KEY: pem }));
-		const headers = new Headers({ 'X-Apple-Device-Token': 'test-token' });
-		expect(await instance.check(headers)).toBe(true);
-		vi.restoreAllMocks();
+		const instance = new worker(makeCtx(), await makeValidEnv());
+		expect(await instance.check(new Headers({ 'X-Apple-Device-Token': 'test-token' }))).toBe(true);
 	});
 
-	it('returns false when upstream responds with non-200', async () => {
-		vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(null, { status: 401 }));
-		const { generateKeyPair, exportPKCS8 } = await import('jose');
-		const { privateKey } = await generateKeyPair('ES256');
-		const pem = await exportPKCS8(privateKey);
-		const instance = new worker(makeCtx(), makeEnv({ APPLE_PRIVATE_KEY: pem }));
-		const headers = new Headers({ 'X-Apple-Device-Token': 'test-token' });
-		expect(await instance.check(headers)).toBe(false);
-		vi.restoreAllMocks();
+	// Apple returns 200 with body "Bit State Not Found" when no bits have been set yet —
+	// this is still a valid/genuine device, so it should resolve to true.
+	it('returns true when upstream responds with 200 Bit State Not Found', async () => {
+		vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('Bit State Not Found', { status: 200 }));
+		const instance = new worker(makeCtx(), await makeValidEnv());
+		expect(await instance.check(new Headers({ 'X-Apple-Device-Token': 'test-token' }))).toBe(true);
+	});
+
+	it.each([
+		[400, 'Bad Device Token'],
+		[400, 'Bad Authorization Token'],
+		[401, 'Invalid Authorization Token'],
+		[401, 'Authorization Token Expired'],
+		[403, 'Forbidden'],
+		[429, 'Too Many Requests'],
+		[500, 'Server Error'],
+		[503, 'Service Unavailable'],
+	])('returns false when upstream responds with %i (%s)', async (status, body) => {
+		vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(body, { status }));
+		const instance = new worker(makeCtx(), await makeValidEnv());
+		expect(await instance.check(new Headers({ 'X-Apple-Device-Token': 'test-token' }))).toBe(false);
 	});
 
 	it('returns false when upstream fetch throws', async () => {
 		vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('network error'));
-		const { generateKeyPair, exportPKCS8 } = await import('jose');
-		const { privateKey } = await generateKeyPair('ES256');
-		const pem = await exportPKCS8(privateKey);
-		const instance = new worker(makeCtx(), makeEnv({ APPLE_PRIVATE_KEY: pem }));
-		const headers = new Headers({ 'X-Apple-Device-Token': 'test-token' });
-		expect(await instance.check(headers)).toBe(false);
-		vi.restoreAllMocks();
+		const instance = new worker(makeCtx(), await makeValidEnv());
+		expect(await instance.check(new Headers({ 'X-Apple-Device-Token': 'test-token' }))).toBe(false);
 	});
 });
