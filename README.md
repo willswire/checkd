@@ -1,7 +1,5 @@
 # checkd
 
-[![push](https://github.com/willswire/checkd/actions/workflows/push.yml/badge.svg)](https://github.com/willswire/checkd/actions/workflows/push.yml)
-
 checkd is a Cloudflare Workers-based server implementation for [Apple's DeviceCheck framework](https://developer.apple.com/documentation/devicecheck), enabling easy validation of requests made by valid Apple devices. This project provides both the core service worker (`checkd`) and example projects (`checkr` iOS app and worker) to demonstrate how to use checkd in an end-to-end workflow.
 
 ## Table of Contents
