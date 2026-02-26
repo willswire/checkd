@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { generateKeyPair, exportPKCS8 } from 'jose';
+import { generateKeyPair, exportPKCS8, decodeJwt } from 'jose';
 import worker from '../src/index';
 
 // Shim WorkerEntrypoint so the class can be instantiated in Node
@@ -23,6 +23,8 @@ function makeEnv(overrides: Partial<Env> = {}): Env {
 		APPLE_KEY_ID: 'test-key-id',
 		APPLE_PRIVATE_KEY: 'test-private-key',
 		APPLE_DEVELOPER_ID: 'test-developer-id',
+		CF_TEAM_NAME: 'test-team',
+		CF_AUD_TAG: 'test-aud-tag',
 		...overrides,
 	};
 }
@@ -133,6 +135,23 @@ describe('check handler', () => {
 		const calledInit = fetchSpy.mock.calls[0][1] as RequestInit;
 		const authHeader = (calledInit.headers as Record<string, string>)['Authorization'];
 		expect(authHeader).toMatch(/^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+	});
+
+	it('does not leak device payload into the JWT claims', async () => {
+		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(null, { status: 200 }));
+		const env = await makeValidEnv();
+		const instance = new worker(makeCtx(), env);
+		await instance.check(new Headers({ 'X-Apple-Device-Token': 'test-token' }));
+		const calledInit = fetchSpy.mock.calls[0][1] as RequestInit;
+		const authHeader = (calledInit.headers as Record<string, string>)['Authorization'];
+		const token = authHeader.replace('Bearer ', '');
+		const claims = decodeJwt(token);
+		expect(claims).not.toHaveProperty('device_token');
+		expect(claims).not.toHaveProperty('transaction_id');
+		expect(claims).not.toHaveProperty('timestamp');
+		expect(claims).toHaveProperty('iss', env.APPLE_DEVELOPER_ID);
+		expect(claims).toHaveProperty('iat');
+		expect(claims).toHaveProperty('exp');
 	});
 
 	it('returns true when upstream responds with 200', async () => {
