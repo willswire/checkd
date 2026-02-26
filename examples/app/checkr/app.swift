@@ -65,12 +65,26 @@ struct ContentView: View {
 					.padding()
 			}
 			
-			TextField("https://checkr.<subdomain>.workers.dev", text: $endpointURL)
-				.autocapitalization(.none)
-				.keyboardType(.URL)
-				.textContentType(.URL)
-				.textFieldStyle(.roundedBorder)
-				.padding()
+			#if os(iOS)
+                if #available(iOS 15.0, *) {
+                    TextField("https://checkr.<subdomain>.workers.dev", text: $endpointURL)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.webSearch)
+                        .textContentType(.URL)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .padding()
+                } else {
+                    TextField("https://checkr.<subdomain>.workers.dev", text: $endpointURL)
+                        .keyboardType(.webSearch)
+                        .textContentType(.URL)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .padding()
+                }
+            #else
+                TextField("https://checkr.<subdomain>.workers.dev", text: $endpointURL)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding()
+            #endif
 			
 			Button("Fetch") {
 				Task {
@@ -116,3 +130,4 @@ struct ContentView: View {
 #Preview {
 	ContentView()
 }
+
