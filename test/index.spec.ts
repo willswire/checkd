@@ -23,8 +23,6 @@ function makeEnv(overrides: Partial<Env> = {}): Env {
 		APPLE_KEY_ID: 'test-key-id',
 		APPLE_PRIVATE_KEY: 'test-private-key',
 		APPLE_DEVELOPER_ID: 'test-developer-id',
-		CF_TEAM_NAME: 'test-team',
-		CF_AUD_TAG: 'test-aud-tag',
 		...overrides,
 	};
 }

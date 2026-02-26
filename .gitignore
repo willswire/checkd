@@ -175,3 +175,6 @@ worker-configuration.d.ts
 # secrets
 
 *.p8
+
+# macOS is dumb
+*.DS_Store

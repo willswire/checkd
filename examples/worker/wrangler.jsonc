@@ -2,7 +2,6 @@
 	"name": "checkr",
 	"main": "src/index.ts",
 	"compatibility_date": "2026-02-25",
-	// "compatibility_flags": ["rpc"],
 	"observability": {
 		"enabled": true,
 	},
