@@ -1,27 +1,39 @@
 import SwiftUI
 import DeviceCheck
 
+var isDevelopment: Bool {
+	#if targetEnvironment(simulator)
+	return true
+	#else
+	guard let receiptURL = Bundle.main.appStoreReceiptURL else { return false }
+	return receiptURL.lastPathComponent == "sandboxReceipt"
+	#endif
+}
+
 class SessionHandler {
 	var session: URLSession
-	
+
 	init() async {
 		let sessionConfiguration = URLSessionConfiguration.default
-		
+
 		let device = DCDevice.current
 		if device.isSupported {
-			print("Device supports DeviceCheck")
-			if let data = try? await device.generateToken() {
-				print("Device token: \(data.base64EncodedString())")
+			do {
+				let data = try await device.generateToken()
 				let tokenString = data.base64EncodedString()
 				sessionConfiguration.httpAdditionalHeaders = [
 					"X-Apple-Device-Token": tokenString,
-					"X-Apple-Device-Development": "true"
+					"X-Apple-Device-Development": String(isDevelopment)
 				]
+			} catch DCError.featureUnsupported {
+				print("DeviceCheck feature unsupported on this device")
+			} catch {
+				print("Failed to generate device token: \(error.localizedDescription)")
 			}
 		} else {
 			print("Device does not support DeviceCheck")
 		}
-		
+
 		self.session = URLSession(configuration: sessionConfiguration)
 	}
 }
