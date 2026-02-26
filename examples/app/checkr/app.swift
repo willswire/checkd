@@ -93,6 +93,8 @@ struct ContentView: View {
 	}
 	
 	func fetch() async {
+		didFail = false
+		errorDescription = nil
 		do {
 			if let url = URL(string: endpointURL) {
 				let sessionHandler = await SessionHandler()
