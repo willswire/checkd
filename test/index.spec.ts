@@ -34,7 +34,7 @@ function makeCtx(): ExecutionContext {
 }
 
 async function makeValidEnv(): Promise<Env> {
-	const { privateKey } = await generateKeyPair('ES256');
+	const { privateKey } = await generateKeyPair('ES256', {extractable: true});
 	const pem = await exportPKCS8(privateKey);
 	return makeEnv({ APPLE_PRIVATE_KEY: pem });
 }
