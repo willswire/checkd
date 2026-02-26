@@ -1,8 +1,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import * as jose from 'jose';
 
-// Define the claim interface extending JWTPayload
-interface DeviceClaim extends jose.JWTPayload {
+interface DevicePayload {
 	device_token: string;
 	transaction_id: string;
 	timestamp: number;
@@ -26,17 +25,17 @@ export default class extends WorkerEntrypoint<Env> {
 			const deviceToken = this.getDeviceToken(headers);
 			const isDevelopment = this.isDevelopmentEnvironment(headers);
 
-			// Create the claim object for the JWT
-			const claim = this.createClaim(deviceToken);
+			// Create the payload for the POST body
+			const payload = this.createPayload(deviceToken);
 
-			// Generate the JWT using the claim
-			const jwt = await this.generateJWT(claim);
+			// Generate the JWT for authorization
+			const jwt = await this.generateJWT();
 
 			// Get the upstream endpoint based on the environment type
 			const upstreamEndpoint = this.getUpstreamEndpoint(isDevelopment);
 
-			// Send the claim to the upstream endpoint and retrieve the response
-			const upstreamResponse = await this.sendUpstreamRequest(upstreamEndpoint, jwt, claim);
+			// Send the payload to the upstream endpoint and retrieve the response
+			const upstreamResponse = await this.sendUpstreamRequest(upstreamEndpoint, jwt, payload);
 
 			// Check if the upstream response status is 200 (OK)
 			return upstreamResponse.status === 200;
@@ -70,11 +69,11 @@ export default class extends WorkerEntrypoint<Env> {
 	}
 
 	/**
-	 * Creates the claim object for the JWT
+	 * Creates the payload for the POST body sent to Apple
 	 * @param deviceToken - The device token string
-	 * @returns The claim object containing device_token, transaction_id, and timestamp
+	 * @returns The payload containing device_token, transaction_id, and timestamp
 	 */
-	private createClaim(deviceToken: string): DeviceClaim {
+	private createPayload(deviceToken: string): DevicePayload {
 		return {
 			device_token: deviceToken,
 			transaction_id: crypto.randomUUID(),
@@ -83,15 +82,14 @@ export default class extends WorkerEntrypoint<Env> {
 	}
 
 	/**
-	 * Generates a JWT using the claim object
-	 * @param claim - The claim object to be signed
+	 * Generates a JWT for authenticating with Apple's DeviceCheck API
 	 * @returns A promise that resolves to the generated JWT string
 	 */
-	private async generateJWT(claim: DeviceClaim): Promise<string> {
+	private async generateJWT(): Promise<string> {
 		const kid = this.env.APPLE_KEY_ID;
 		const privateKey = await jose.importPKCS8(this.env.APPLE_PRIVATE_KEY, 'ES256');
 
-		return new jose.SignJWT(claim)
+		return new jose.SignJWT({})
 			.setProtectedHeader({ alg: 'ES256', kid })
 			.setIssuedAt()
 			.setIssuer(this.env.APPLE_DEVELOPER_ID)
@@ -110,16 +108,16 @@ export default class extends WorkerEntrypoint<Env> {
 	}
 
 	/**
-	 * Sends the claim to the upstream endpoint and retrieves the response
+	 * Sends the payload to the upstream endpoint and retrieves the response
 	 * @param upstreamEndpoint - The upstream endpoint URL
 	 * @param jwt - The generated JWT string
-	 * @param claim - The claim object to be sent
+	 * @param payload - The device payload to be sent
 	 * @returns A promise that resolves to the upstream response object
 	 */
-	private async sendUpstreamRequest(upstreamEndpoint: string, jwt: string, claim: DeviceClaim): Promise<Response> {
+	private async sendUpstreamRequest(upstreamEndpoint: string, jwt: string, payload: DevicePayload): Promise<Response> {
 		return fetch(upstreamEndpoint, {
 			method: 'POST',
-			body: JSON.stringify(claim),
+			body: JSON.stringify(payload),
 			headers: {
 				Authorization: `Bearer ${jwt}`,
 				'Content-Type': 'application/json',
