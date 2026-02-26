@@ -7,15 +7,16 @@
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
 		"test": "vitest",
-		"cf-typegen": "wrangler types"
+		"generate-types": "wrangler types",
+		"type-check": "generate-types && tsc"
 	},
 	"devDependencies": {
-		"@vitest/coverage-v8": "~3.2.0",
-		"typescript": "^5.5.4",
-		"vitest": "~3.2.0",
-		"wrangler": "^3.101.0"
+		"@vitest/coverage-v8": "^4.0.18",
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.1",
+		"wrangler": "^4.68.1"
 	},
 	"dependencies": {
-		"jose": "^5.8.0"
+		"jose": "^6.1.3"
 	}
 }
