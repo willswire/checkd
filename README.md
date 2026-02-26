@@ -1,6 +1,6 @@
 # checkd
 
-[![deploy](https://github.com/willswire/checkd/actions/workflows/deploy-worker.yaml/badge.svg?event=release)](https://github.com/willswire/checkd/actions/workflows/deploy-worker.yaml)
+[![push](https://github.com/willswire/checkd/actions/workflows/push.yml/badge.svg)](https://github.com/willswire/checkd/actions/workflows/push.yml)
 
 checkd is a Cloudflare Workers-based server implementation for [Apple's DeviceCheck framework](https://developer.apple.com/documentation/devicecheck), enabling easy validation of requests made by valid Apple devices. This project provides both the core service worker (`checkd`) and example projects (`checkr` iOS app and worker) to demonstrate how to use checkd in an end-to-end workflow.
 
@@ -36,7 +36,7 @@ The `checkd` service worker provides the functionality to validate whether an Ap
 ### Key Files
 
 - **`src/index.ts`**: The main worker file where the functionality resides.
-- **`wrangler.toml`**: Configuration file for deploying the worker with Cloudflare Wrangler.
+- **`wrangler.jsonc`**: Configuration file for deploying the worker with Cloudflare Wrangler.
 - **`tsconfig.json`**: TypeScript configuration file.
 - **Environment Variables**: These include `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, `APPLE_DEVELOPER_ID`.
 
@@ -65,8 +65,8 @@ The `checkr` iOS App demonstrates client-side implementation:
 
 ### Key Files in Examples
 
-- **Worker**: The main implementation file `src/index.ts` and configuration files (`wrangler.toml`, `tsconfig.json`).
-- **iOS App**: `ContentView.swift` managing the UI flow, and `SessionHandler.swift` handling the DeviceCheck logic.
+- **Worker**: The main implementation file `src/index.ts` and configuration files (`wrangler.jsonc`, `tsconfig.json`).
+- **iOS App**: `app.swift` containing the UI (`ContentView`) and DeviceCheck logic (`SessionHandler`).
 
 ## Setup and Installation
 
@@ -104,7 +104,7 @@ cd checkd/examples/app/checkr
 
 ### Set Environment Variables
 
-Define the required environment variables (APPLE_KEY_ID, APPLE_PRIVATE_KEY, APPLE_DEVELOPER_ID) in the `wrangler.toml` file or via the Cloudflare Dashboard.
+Define the required environment variables (APPLE_KEY_ID, APPLE_PRIVATE_KEY, APPLE_DEVELOPER_ID) in the `wrangler.jsonc` file or via the Cloudflare Dashboard.
 
 ### Deploy the Cloudflare Worker
 
