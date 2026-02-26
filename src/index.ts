@@ -75,11 +75,10 @@ export default class extends WorkerEntrypoint<Env> {
 	 * @returns The claim object containing device_token, transaction_id, and timestamp
 	 */
 	private createClaim(deviceToken: string): DeviceClaim {
-		const currentTimestamp = Date.now();
 		return {
 			device_token: deviceToken,
-			transaction_id: `trns-${currentTimestamp}`,
-			timestamp: currentTimestamp,
+			transaction_id: crypto.randomUUID(),
+			timestamp: Date.now(),
 		};
 	}
 
@@ -118,20 +117,13 @@ export default class extends WorkerEntrypoint<Env> {
 	 * @returns A promise that resolves to the upstream response object
 	 */
 	private async sendUpstreamRequest(upstreamEndpoint: string, jwt: string, claim: DeviceClaim): Promise<Response> {
-		const requestInit: RequestInit = {
+		return fetch(upstreamEndpoint, {
 			method: 'POST',
 			body: JSON.stringify(claim),
 			headers: {
 				Authorization: `Bearer ${jwt}`,
 				'Content-Type': 'application/json',
 			},
-		};
-
-		try {
-			return await fetch(upstreamEndpoint, requestInit);
-		} catch (error) {
-			console.error('Failed to send request to upstream endpoint:', error);
-			throw new Error('Failed to send request to upstream');
-		}
+		});
 	}
 }
