@@ -15,5 +15,5 @@ jobs:
           node-version: lts/*
           cache: npm
       - run: npm ci
-      - run: npm run generate-types
+      - run: npm run cf-typegen
       - run: npm test

@@ -92,14 +92,6 @@ web_modules/
 
 .yarn-integrity
 
-# dotenv environment variable files
-
-.env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
-
 # parcel-bundler cache (https://parceljs.org/)
 
 .cache
@@ -168,7 +160,10 @@ dist
 
 # wrangler project
 
-.dev.vars
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
 .wrangler/
 worker-configuration.d.ts
 
@@ -176,5 +171,6 @@ worker-configuration.d.ts
 
 *.p8
 
-# macOS is dumb
-*.DS_Store
+# macOS
+
+.DS_Store

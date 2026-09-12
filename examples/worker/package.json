@@ -6,11 +6,12 @@
 		"deploy": "wrangler deploy",
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
-		"generate-types": "wrangler types --c wrangler.jsonc --c ../../wrangler.jsonc",
-		"type-check": "generate-types && tsc"
+		"cf-typegen": "wrangler types -c wrangler.jsonc -c ../../wrangler.jsonc",
+		"type-check": "npm run cf-typegen && tsc"
 	},
 	"devDependencies": {
+		"@types/node": "^22.20.2",
 		"typescript": "^5.9.3",
-		"wrangler": "^4.68.1"
+		"wrangler": "^4.130.0"
 	}
 }

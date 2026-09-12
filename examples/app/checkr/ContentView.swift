@@ -1,6 +1,15 @@
 import SwiftUI
 import DeviceCheck
 
+@main struct checkr: App {
+	var body: some Scene {
+		WindowGroup {
+			ContentView()
+		}
+	}
+}
+
+/// Whether device tokens should be validated against Apple's development environment.
 var isDevelopment: Bool {
 	#if targetEnvironment(simulator)
 	return true
@@ -38,21 +47,12 @@ class SessionHandler {
 	}
 }
 
-@main
-struct checkr: App {
-	var body: some Scene {
-		WindowGroup {
-			ContentView()
-		}
-	}
-}
-
 struct ContentView: View {
-	@AppStorage("endpointURL") private var endpointURL: String = ""
+	@AppStorage("endpointURL") private var endpointURL = ""
 	@State private var result: String?
-	@State private var didFail: Bool = false
+	@State private var didFail = false
 	@State private var errorDescription: String?
-	
+
 	var body: some View {
 		VStack {
 			if let result {
@@ -64,28 +64,16 @@ struct ContentView: View {
 					.font(.title)
 					.padding()
 			}
-			
-			#if os(iOS)
-                if #available(iOS 15.0, *) {
-                    TextField("https://checkr.<subdomain>.workers.dev", text: $endpointURL)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.webSearch)
-                        .textContentType(.URL)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding()
-                } else {
-                    TextField("https://checkr.<subdomain>.workers.dev", text: $endpointURL)
-                        .keyboardType(.webSearch)
-                        .textContentType(.URL)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding()
-                }
-            #else
-                TextField("https://checkr.<subdomain>.workers.dev", text: $endpointURL)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .padding()
-            #endif
-			
+
+			TextField("https://checkr.<subdomain>.workers.dev", text: $endpointURL)
+				.textFieldStyle(.roundedBorder)
+				#if !os(macOS)
+				.textInputAutocapitalization(.never)
+				.keyboardType(.webSearch)
+				.textContentType(.URL)
+				#endif
+				.padding()
+
 			Button("Fetch") {
 				Task {
 					await fetch()
@@ -103,9 +91,8 @@ struct ContentView: View {
 		} message: {
 			Text(errorDescription ?? "An unknown error occurred")
 		}
-		
 	}
-	
+
 	func fetch() async {
 		didFail = false
 		errorDescription = nil
@@ -130,4 +117,3 @@ struct ContentView: View {
 #Preview {
 	ContentView()
 }
-

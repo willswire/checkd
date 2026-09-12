@@ -7,14 +7,16 @@
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
 		"test": "vitest",
-		"generate-types": "wrangler types",
-		"type-check": "generate-types && tsc"
+		"cf-typegen": "wrangler types",
+		"type-check": "npm run cf-typegen && tsc && tsc -p test"
 	},
 	"devDependencies": {
-		"@vitest/coverage-v8": "^4.0.18",
+		"@cloudflare/vitest-plugin": "^1.0.0",
+		"@types/node": "^22.20.2",
+		"@vitest/coverage-istanbul": "~4.1.0",
 		"typescript": "^5.9.3",
-		"vitest": "^4.0.1",
-		"wrangler": "^4.68.1"
+		"vitest": "~4.1.0",
+		"wrangler": "^4.130.0"
 	},
 	"dependencies": {
 		"jose": "^6.1.3"

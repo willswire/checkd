@@ -1,6 +1,6 @@
 # checkd
 
-checkd is a Cloudflare Workers-based server implementation for [Apple's DeviceCheck framework](https://developer.apple.com/documentation/devicecheck), enabling easy validation of requests made by valid Apple devices. This project provides both the core service worker (`checkd`) and example projects (`checkr` iOS app and worker) to demonstrate how to use checkd in an end-to-end workflow.
+checkd is a Cloudflare Workers-based server implementation for [Apple's DeviceCheck framework](https://developer.apple.com/documentation/devicecheck), enabling easy validation of requests made by valid Apple devices. This project provides both the core service worker (`checkd`) and example projects (`checkr` app and worker) to demonstrate how to use checkd in an end-to-end workflow.
 
 ## Table of Contents
 
@@ -40,18 +40,18 @@ The `checkd` service worker provides the functionality to validate whether an Ap
 
 ## Examples for End-to-End Workflow
 
-To showcase the functionality of `checkd`, the project includes example implementations—a companion worker (`checkr`) and an iOS app (`checkr`).
+To showcase the functionality of `checkd`, the project includes example implementations—a companion worker (`checkr`) and a SwiftUI app (`checkr`).
 
 ### Checkr Worker
 
-The `checkr` worker acts as an intermediary between the client (iOS app) and the `checkd` service worker.
+The `checkr` worker acts as an intermediary between the client (the app) and the `checkd` service worker.
 
-### Checkr iOS App
+### Checkr App
 
-The `checkr` iOS App demonstrates client-side implementation:
+The `checkr` app (iOS, macOS, and visionOS) demonstrates client-side implementation:
 
 1. **Device Token Generation**:
-    - Uses Apple's `DCDevice` to generate a device token on an iOS device.
+    - Uses Apple's `DCDevice` to generate a device token on the device.
 
 2. **Request to Checkr Worker**:
     - Sends the generated device token to the `checkr` worker.
@@ -59,12 +59,12 @@ The `checkr` iOS App demonstrates client-side implementation:
 3. **Validation Workflow**:
     - The `checkr` worker forwards the request to the `checkd` service worker.
     - The `checkd` worker then validates the device token with Apple's DeviceCheck API.
-    - Returns the validation result back through the `checkr` worker to the iOS app.
+    - Returns the validation result back through the `checkr` worker to the app.
 
 ### Key Files in Examples
 
 - **Worker**: The main implementation file `src/index.ts` and configuration files (`wrangler.jsonc`, `tsconfig.json`).
-- **iOS App**: `app.swift` containing the UI (`ContentView`) and DeviceCheck logic (`SessionHandler`).
+- **App**: `ContentView.swift` containing the app entry point, the UI (`ContentView`), and DeviceCheck logic (`SessionHandler`).
 
 ## Setup and Installation
 
@@ -93,16 +93,15 @@ cd checkd/examples/worker
 npm install
 ```
 
-For the iOS app:
+For the app:
 
 ```sh
-cd checkd/examples/app/checkr
-# Open the Xcode project or workspace file, resolve dependencies if needed
+open checkd/examples/app/checkr.xcodeproj
 ```
 
 ### Set Environment Variables
 
-Define the required environment variables (APPLE_KEY_ID, APPLE_PRIVATE_KEY, APPLE_DEVELOPER_ID) in the `wrangler.jsonc` file or via the Cloudflare Dashboard.
+For local development, copy `.env.example` to `.env` and fill in `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, and `APPLE_DEVELOPER_ID`. Wrangler reads this file for `wrangler dev` and when generating the `Env` types with `npm run cf-typegen`. For deployed Workers, set them as secrets with `wrangler secret put <NAME>` or via the Cloudflare Dashboard.
 
 ### Deploy the Cloudflare Worker
 
@@ -120,9 +119,9 @@ cd checkd/examples/worker
 npm run deploy
 ```
 
-### Run the iOS App
+### Run the App
 
-Open `checkd/examples/app/checkr/checkr.xcodeproj` in Xcode, configure your signing information, and build and run the app on a physical device. Device tokens cannot be generated in a simulator.
+Open `checkd/examples/app/checkr.xcodeproj` in Xcode, configure your signing information, and build and run the app on a physical device. Device tokens cannot be generated in a simulator.
 
 ## Contributing
 

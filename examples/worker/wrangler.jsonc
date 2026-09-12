@@ -1,17 +1,25 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
 {
+	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "checkr",
 	"main": "src/index.ts",
-	"compatibility_date": "2026-02-25",
+	"compatibility_date": "2026-09-07",
 	"observability": {
-		"enabled": true,
+		"enabled": true
 	},
-	// Bind another Worker service. Use this binding to call another Worker without network overhead.
-	// Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
+	"upload_source_maps": true,
+	/**
+	 * Service Bindings (communicate between multiple Workers)
+	 * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
+	 */
 	"services": [
 		{
 			"binding": "CHECKD",
 			"service": "checkd",
 			"entrypoint": "default"
-		},
-	],
+		}
+	]
 }
